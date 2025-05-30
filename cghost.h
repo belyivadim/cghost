@@ -23,6 +23,10 @@
 
 //---------------------------------------| DECLARATIONS |
 
+// General macros
+#define CAT(a, b) CAT_INNER(a, b)
+#define CAT_INNER(a, b) a##b
+
 // Allocator stack
 // @allocator is actual allocator pointer such as Arena*, not CgAllocator*
 typedef void *(*CgMallocFn)(void *allocator, size_t size);
@@ -78,6 +82,9 @@ CGHOST_API size_t cg_as_top;
 #define DA_INIT_CAPACITY 64
 #endif
 
+// size of the static C array
+#define ARR_SIZE(arr) (sizeof((arr)) / sizeof((arr)[0]))
+
 #define DA_EMBED(T)                                                            \
   T *items;                                                                    \
   size_t count;                                                                \
@@ -86,7 +93,36 @@ CGHOST_API size_t cg_as_top;
 #define DA_STRUCT(T, name)                                                     \
   typedef struct name {                                                        \
     DA_EMBED(T)                                                                \
-  } name
+  } name;
+
+#define da_from_list(T, ...)                                                   \
+  da_from_list_##T((T[]){__VA_ARGS__}, sizeof((T[]){__VA_ARGS__}) / sizeof(T))
+
+#define DA_DECL_TYPE(T, name)                                                  \
+  DA_STRUCT(T, name)                                                           \
+  static inline name da_from_list_##T(const T *arr, size_t count) {            \
+    name result;                                                               \
+    result.count = count;                                                      \
+    result.capacity = count;                                                   \
+    result.items = CG_MALLOC(CG_ALLOCATOR_INSTANCE, count * sizeof(T));        \
+    memcpy(result.items, arr, count * sizeof(T));                              \
+    return result;                                                             \
+  }                                                                            \
+                                                                               \
+  static inline name da_clone_##T(name da) {                                   \
+    return (name){                                                             \
+        .items =                                                               \
+            da_clone_items((da).items, sizeof((da).items[0]), (da).count),     \
+        .count = da.count,                                                     \
+        .capacity = da.capacity,                                               \
+    };                                                                         \
+  }
+
+#ifndef DA_AUTO_SUFIX
+#define DA_AUTO_SUFIX Arr
+#endif
+
+#define DA_DECL_TYPE_AUTO(T) DA_DECL_TYPE(T, CAT(T, DA_AUTO_SUFIX))
 
 #define da_alloc_reserved(da, capacity_)                                       \
   do {                                                                         \
@@ -145,7 +181,9 @@ CGHOST_API size_t cg_as_top;
                             sizeof(*(da).items) * (new_capacity));             \
     assert(NULL != (da).items && "Failed to allocate memory for dynamic "      \
                                  "array");                                     \
-    (da).capacity = new_capacity;                                              \
+    memset((da).items + (da).count, 0,                                         \
+           ((new_capacity) - (da).count) * sizeof((da).items[0]));             \
+    (da).capacity = (new_capacity);                                            \
   } while (0)
 
 #define da_maybe_expand(da)                                                    \
@@ -182,6 +220,8 @@ CGHOST_API size_t cg_as_top;
     }                                                                          \
   } while (0)
 
+CGHOST_API void *da_clone_items(void *items, size_t el_size, size_t count);
+
 // StringView
 typedef struct {
   const char *begin;
@@ -195,6 +235,7 @@ typedef struct {
 #define sv_from_constant(c)                                                    \
   ((StringView){.begin = (c), .length = sizeof((c)) - 1})
 #define sv_from_sb(sb) ((StringView){.begin = (sb).items, .length = (sb).count})
+#define sv_from_str(str) sv_from_sb((str).h->b)
 
 #define sv_farg "%.*s"
 #define sv_expand(sv) (int)(sv).length, (sv).begin
@@ -236,19 +277,52 @@ typedef struct {
 
 #define sb_free(sb) da_free((sb))
 #define sb_length(sb) da_count((sb))
-#define sb_expand(sb, new_capacity)                                            \
+#define sb_expand_buffer(sb, new_capacity)                                     \
   do {                                                                         \
     if ((sb).capacity < (new_capacity)) {                                      \
       da_resize((sb), (new_capacity));                                         \
     }                                                                          \
   } while (0)
 
+#define sb_farg "%.*s"
+#define sb_expand(sb) (int)(sb).count, (sb).items
+
 CGHOST_API StringBuilder sb_create(size_t capacity);
+CGHOST_API StringBuilder sb_clone(const StringBuilder *sb);
 CGHOST_API void sb_append_rune(StringBuilder *sb, int rune);
 CGHOST_API void sb_append_string_view(StringBuilder *sb, const StringView *sv);
 CGHOST_API void sb_append_cstr(StringBuilder *sb, const char *cstr);
+CGHOST_API void sb_append_sb(StringBuilder *dest, const StringBuilder *src);
+#define sb_append_str(sb_ptr, str_ptr) sb_append_sb((sb_ptr), &(str_ptr)->h->b)
 CGHOST_API char *sb_get_cstr(StringBuilder *sb);
 CGHOST_API void sb_appendf(StringBuilder *sb, const char *fmt, ...);
+
+// COW String
+
+typedef struct CowStrHeader {
+  StringBuilder b;
+  size_t refcount;
+} CowStrHeader;
+
+typedef struct CowStr {
+  CowStrHeader *h;
+} Str;
+
+#define str_is_unique(str) ((str).h->refcount == 1)
+#define str_make_unique(str)                                                   \
+  (str_is_unique((str)) ? (str) : str_clone_unique(&(str)))
+#define str_empty str_create(0)
+
+#define str_farg "%.*s"
+#define str_expand(str) sb_expand((str).h->b)
+
+CGHOST_API Str str_create(size_t capacity);
+CGHOST_API Str str_from_sv(StringView sv);
+CGHOST_API Str str_from_cstr(const char *cstr);
+CGHOST_API Str str_clone(Str *str);
+CGHOST_API Str str_clone_unique(Str *str);
+CGHOST_API Str str_move(Str *str);
+CGHOST_API void str_free(Str *str);
 
 // IO and File system
 CGHOST_API bool read_entire_file(const char *path, StringBuilder *sb);
@@ -297,7 +371,7 @@ typedef struct Clarg {
   ClargValue value;
 } Clarg;
 
-DA_STRUCT(Clarg, Clargs);
+DA_STRUCT(Clarg, Clargs)
 
 typedef struct ClargParser {
   Clargs options;
@@ -447,6 +521,13 @@ CGHOST_API void std_free(void *a, void *ptr) {
   free(ptr);
 }
 
+// Dynamic array
+CGHOST_API void *da_clone_items(void *items, size_t el_size, size_t count) {
+  void *clone = CG_MALLOC(CG_ALLOCATOR_INSTANCE, count * el_size);
+  memcpy(clone, items, count * el_size);
+  return clone;
+}
+
 // StringView
 CGHOST_API bool sv_equals(const StringView *lhs, const StringView *rhs) {
   assert(NULL != lhs);
@@ -578,6 +659,12 @@ CGHOST_API StringBuilder sb_create(size_t capacity) {
   return sb;
 }
 
+CGHOST_API StringBuilder sb_clone(const StringBuilder *sb) {
+  StringBuilder clone = sb_create(sb->count);
+  memcpy(clone.items, sb->items, sb->count);
+  return clone;
+}
+
 CGHOST_API void sb_append_rune(StringBuilder *sb, int rune) {
   assert(rune >= -128 && rune <= 127);
   da_push(*sb, (char)rune);
@@ -594,6 +681,16 @@ CGHOST_API void sb_append_cstr(StringBuilder *sb, const char *cstr) {
   sb_append_string_view(sb, &sv);
 }
 
+CGHOST_API void sb_append_sb(StringBuilder *dest, const StringBuilder *src) {
+  size_t new_capacity = dest->count + src->count;
+  if (dest->capacity < new_capacity) {
+    sb_expand_buffer(*dest, new_capacity);
+    dest->capacity = new_capacity;
+  }
+  memcpy(dest->items + dest->count, src->items, src->count);
+  dest->count = new_capacity;
+}
+
 CGHOST_API char *sb_get_cstr(StringBuilder *sb) {
   if ('\0' != sb->items[sb->count])
     da_push(*sb, '\0');
@@ -607,7 +704,7 @@ CGHOST_API void sb_appendf(StringBuilder *sb, const char *fmt, ...) {
   va_start(args, fmt);
   int n = vsnprintf(NULL, 0, fmt, args);
   va_end(args);
-  sb_expand(*sb, sb->count + n + 1);
+  sb_expand_buffer(*sb, sb->count + n + 1);
   va_start(args, fmt);
   vsnprintf(sb->items + sb->count, n + 1, fmt, args);
   va_end(args);
@@ -641,7 +738,7 @@ CGHOST_API bool read_entire_file(const char *path, StringBuilder *sb) {
   }
 
   size_t new_count = sb->count + m;
-  sb_expand(*sb, new_count);
+  sb_expand_buffer(*sb, new_count);
 
   fread(sb->items + sb->count, m, 1, f);
   if (ferror(f)) {
@@ -681,6 +778,59 @@ CGHOST_API bool mkdirp(StringView path, mode_t mode) {
 
   sb_free(sb);
   return true;
+}
+
+// COW String
+
+CGHOST_API Str str_create(size_t capacity) {
+  CowStrHeader *h = CG_MALLOC(CG_ALLOCATOR_INSTANCE, sizeof(CowStrHeader));
+  assert(NULL != h);
+  *h = (CowStrHeader){
+      .b = sb_create(capacity),
+      .refcount = 1,
+  };
+  return (Str){.h = h};
+}
+
+CGHOST_API Str str_from_sv(StringView sv) {
+  Str str = str_create(sv.length);
+  memcpy(str.h->b.items, sv.begin, sv.length);
+  str.h->b.count = sv.length;
+  return str;
+}
+
+CGHOST_API Str str_from_cstr(const char *cstr) {
+  return str_from_sv(sv_from_cstr(cstr));
+}
+
+CGHOST_API Str str_clone_unique(Str *str) {
+  return str_from_sv(sv_from_str(*str));
+}
+
+CGHOST_API Str str_move(Str *str) {
+  if (str_is_unique(*str)) {
+    return *str;
+  } else {
+    Str clone = str_clone_unique(str);
+    str_free(str);
+    return clone;
+  }
+}
+
+CGHOST_API Str str_clone(Str *str) {
+  str->h->refcount += 1;
+  return (Str){.h = str->h};
+}
+
+CGHOST_API void str_free(Str *str) {
+  if (NULL == str || NULL == str->h)
+    return;
+  str->h->refcount -= 1;
+  if (str->h->refcount <= 0) {
+    sb_free(str->h->b);
+    CG_FREE(CG_ALLOCATOR_INSTANCE, str->h);
+  }
+  str->h = NULL;
 }
 
 // Clargs
