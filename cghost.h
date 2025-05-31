@@ -318,6 +318,7 @@ typedef struct CowStr {
 
 CGHOST_API Str str_create(size_t capacity);
 CGHOST_API Str str_from_sv(StringView sv);
+CGHOST_API Str str_from_sb(StringBuilder sb);
 CGHOST_API Str str_from_cstr(const char *cstr);
 CGHOST_API Str str_clone(Str *str);
 CGHOST_API Str str_clone_unique(Str *str);
@@ -477,6 +478,8 @@ CGHOST_API CgAllocator garena_allocator;
 
 #define g_alloc_t(Type) ((Type *)g_alloc(sizeof(Type)))
 #define g_alloc_array(Type, count) ((Type *)g_alloc(sizeof(Type) * (count)))
+
+#endif // __CGHOST_H__
 
 //---------------------------------------| IMPLEMENATION |
 #ifdef CGHOST_IMPLEMENTATION
@@ -801,6 +804,16 @@ CGHOST_API Str str_from_sv(StringView sv) {
 
 CGHOST_API Str str_from_cstr(const char *cstr) {
   return str_from_sv(sv_from_cstr(cstr));
+}
+
+CGHOST_API Str str_from_sb(StringBuilder sb) {
+  bool terminated = sb.count > 0 && sb.items[sb.count - 1] == '\0';
+  Str str = str_create(sb.count + !terminated);
+  memcpy(str.h->b.items, sb.items, sb.count);
+  if (!terminated) {
+    sb_append_rune(&str.h->b, '\0');
+  }
+  return str;
 }
 
 CGHOST_API Str str_clone_unique(Str *str) {
@@ -1169,4 +1182,3 @@ CGHOST_API void garena_return(void *ptr) { arena_return(&garena, ptr); }
 CGHOST_API void garena_free(void) { arena_free(&garena); }
 
 #endif // CGHOST_IMPLEMENTATION
-#endif // __CGHOST_H__
