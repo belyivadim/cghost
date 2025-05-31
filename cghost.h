@@ -260,6 +260,8 @@ CGHOST_API bool sv_starts_with_icase(const StringView *sv,
 CGHOST_API bool sv_ends_with(const StringView *sv, const StringView *end);
 CGHOST_API bool sv_ends_with_icase(const StringView *sv, const StringView *end);
 CGHOST_API void sv_stripl(StringView *sv);
+CGHOST_API void sv_stripr(StringView *sv);
+CGHOST_API void sv_strip(StringView *sv);
 
 CGHOST_API int sv_index_of(const StringView *sv, int rune);
 CGHOST_API int sv_last_index_of(const StringView *sv, int rune);
@@ -603,6 +605,16 @@ CGHOST_API bool sv_ends_with_icase(const StringView *sv,
 CGHOST_API void sv_stripl(StringView *sv) {
   while (sv->length > 0 && isspace(sv->begin[0]))
     sv_advance(*sv);
+}
+
+CGHOST_API void sv_stripr(StringView *sv) {
+  while (sv->length > 0 && isspace(sv->begin[sv->length - 1]))
+    sv->length -= 1;
+}
+
+CGHOST_API void sv_strip(StringView *sv) {
+  sv_stripl(sv);
+  sv_stripr(sv);
 }
 
 CGHOST_API int sv_index_of(const StringView *sv, int rune) {
