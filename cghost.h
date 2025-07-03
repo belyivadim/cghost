@@ -27,6 +27,14 @@
 #define CAT(a, b) CAT_INNER(a, b)
 #define CAT_INNER(a, b) a##b
 
+#define unreachable                                                            \
+  (fprintf(stderr, "%s:%d: The program hit the unreachable statemnet\n",       \
+           __FILE__, __LINE__),                                                \
+   abort())
+
+#define todo(what)                                                             \
+  (fprintf(stderr, "%s:%d: TODO: %s\n", __FILE__, __LINE__, (what)), abort())
+
 // Allocator stack
 // @allocator is actual allocator pointer such as Arena*, not CgAllocator*
 typedef void *(*CgMallocFn)(void *allocator, size_t size);
@@ -290,14 +298,18 @@ typedef struct {
 #define sb_expand(sb) (int)(sb).count, (sb).items
 
 CGHOST_API StringBuilder sb_create(size_t capacity);
+CGHOST_API StringBuilder sb_create_and_fill(size_t capacity, int rune);
+CGHOST_API StringBuilder sb_createf(const char *fmt, ...);
 CGHOST_API StringBuilder sb_clone(const StringBuilder *sb);
-CGHOST_API void sb_append_rune(StringBuilder *sb, int rune);
-CGHOST_API void sb_append_string_view(StringBuilder *sb, const StringView *sv);
-CGHOST_API void sb_append_cstr(StringBuilder *sb, const char *cstr);
-CGHOST_API void sb_append_sb(StringBuilder *dest, const StringBuilder *src);
+CGHOST_API StringBuilder *sb_append_rune(StringBuilder *sb, int rune);
+CGHOST_API StringBuilder *sb_append_string_view(StringBuilder *sb,
+                                                const StringView *sv);
+CGHOST_API StringBuilder *sb_append_cstr(StringBuilder *sb, const char *cstr);
+CGHOST_API StringBuilder *sb_append_sb(StringBuilder *dest,
+                                       const StringBuilder *src);
 #define sb_append_str(sb_ptr, str_ptr) sb_append_sb((sb_ptr), &(str_ptr)->h->b)
 CGHOST_API char *sb_get_cstr(StringBuilder *sb);
-CGHOST_API void sb_appendf(StringBuilder *sb, const char *fmt, ...);
+CGHOST_API StringBuilder *sb_appendf(StringBuilder *sb, const char *fmt, ...);
 
 // COW String
 
@@ -674,29 +686,58 @@ CGHOST_API StringBuilder sb_create(size_t capacity) {
   return sb;
 }
 
+CGHOST_API StringBuilder sb_create_and_fill(size_t capacity, int rune) {
+  assert(rune >= -128 && rune <= 127);
+  StringBuilder sb = sb_create(capacity + 1);
+  memset(sb.items, rune, capacity);
+  sb.count = capacity;
+  return sb;
+}
+
+CGHOST_API StringBuilder sb_createf(const char *fmt, ...) {
+  va_list args;
+  va_start(args, fmt);
+  va_list args_copy;
+  va_copy(args_copy, args);
+  int n = vsnprintf(NULL, 0, fmt, args_copy);
+  va_end(args);
+  StringBuilder sb = sb_create(n + 1);
+  va_start(args, fmt);
+  vsnprintf(sb.items, n + 1, fmt, args);
+  va_end(args);
+  va_end(args_copy);
+  sb.count = n;
+  return sb;
+}
+
 CGHOST_API StringBuilder sb_clone(const StringBuilder *sb) {
   StringBuilder clone = sb_create(sb->count);
   memcpy(clone.items, sb->items, sb->count);
   return clone;
 }
 
-CGHOST_API void sb_append_rune(StringBuilder *sb, int rune) {
+CGHOST_API StringBuilder *sb_append_rune(StringBuilder *sb, int rune) {
   assert(rune >= -128 && rune <= 127);
   da_push(*sb, (char)rune);
+  return sb;
 }
 
-CGHOST_API void sb_append_string_view(StringBuilder *sb, const StringView *sv) {
+CGHOST_API StringBuilder *sb_append_string_view(StringBuilder *sb,
+                                                const StringView *sv) {
   for (size_t i = 0; i < sv->length; ++i) {
     sb_append_rune(sb, sv->begin[i]);
   }
+  return sb;
 }
 
-CGHOST_API void sb_append_cstr(StringBuilder *sb, const char *cstr) {
+CGHOST_API StringBuilder *sb_append_cstr(StringBuilder *sb, const char *cstr) {
   StringView sv = sv_from_cstr(cstr);
   sb_append_string_view(sb, &sv);
+  return sb;
 }
 
-CGHOST_API void sb_append_sb(StringBuilder *dest, const StringBuilder *src) {
+CGHOST_API StringBuilder *sb_append_sb(StringBuilder *dest,
+                                       const StringBuilder *src) {
   size_t new_capacity = dest->count + src->count;
   if (dest->capacity < new_capacity) {
     sb_expand_buffer(*dest, new_capacity);
@@ -704,6 +745,7 @@ CGHOST_API void sb_append_sb(StringBuilder *dest, const StringBuilder *src) {
   }
   memcpy(dest->items + dest->count, src->items, src->count);
   dest->count = new_capacity;
+  return dest;
 }
 
 CGHOST_API char *sb_get_cstr(StringBuilder *sb) {
@@ -713,17 +755,21 @@ CGHOST_API char *sb_get_cstr(StringBuilder *sb) {
   return sb->items;
 }
 
-CGHOST_API void sb_appendf(StringBuilder *sb, const char *fmt, ...) {
+CGHOST_API StringBuilder *sb_appendf(StringBuilder *sb, const char *fmt, ...) {
   assert(NULL != sb);
   va_list args;
   va_start(args, fmt);
-  int n = vsnprintf(NULL, 0, fmt, args);
+  va_list args_copy;
+  va_copy(args_copy, args);
+  int n = vsnprintf(NULL, 0, fmt, args_copy);
   va_end(args);
   sb_expand_buffer(*sb, sb->count + n + 1);
   va_start(args, fmt);
   vsnprintf(sb->items + sb->count, n + 1, fmt, args);
   va_end(args);
+  va_end(args_copy);
   sb->count += n;
+  return sb;
 }
 
 // IO
