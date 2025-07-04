@@ -497,10 +497,21 @@ CGHOST_API CgAllocator garena_allocator;
 #include <stdarg.h>
 
 // Allocator
-CgAllocator cg_as[CGHOST_ALLOCATOR_STACK_SIZE];
-size_t cg_as_top;
 
-// stdallocator
+// alocator stack
+CgAllocator cg_as[CGHOST_ALLOCATOR_STACK_SIZE] = {
+    // std allocator by default
+    {
+        .allocator = NULL,
+        .malloc = std_malloc,
+        .calloc = std_calloc,
+        .realloc = std_realloc,
+        .free = std_free,
+    },
+};
+size_t cg_as_top = 1;
+
+// std allocator
 CgAllocator std_allocator = {
     .allocator = NULL,
     .malloc = std_malloc,
