@@ -1,12 +1,12 @@
 #define CGHOST_ALLOCATOR_STACK_SIZE 64
 #define CGHOST_IMPLEMENTATION
-#include "../src/cghost.h"
+#include "../cghost.h"
 #include <stdio.h>
 
-#define assert_msg(cond, msg)                                                  \
-  if (!(cond)) {                                                               \
-    fprintf(stderr, "Test failed: %s\n", msg);                                 \
-    return 1;                                                                  \
+#define assert_msg(cond, msg)                  \
+  if (!(cond)) {                               \
+    fprintf(stderr, "Test failed: %s\n", msg); \
+    return 1;                                  \
   }
 
 int test_arena_basic_alloc() {
