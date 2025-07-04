@@ -27,12 +27,12 @@
 #define CAT(a, b) CAT_INNER(a, b)
 #define CAT_INNER(a, b) a##b
 
-#define unreachable                                                            \
-  (fprintf(stderr, "%s:%d: The program hit the unreachable statemnet\n",       \
-           __FILE__, __LINE__),                                                \
+#define unreachable                                                      \
+  (fprintf(stderr, "%s:%d: The program hit the unreachable statemnet\n", \
+           __FILE__, __LINE__),                                          \
    abort())
 
-#define todo(what)                                                             \
+#define todo(what) \
   (fprintf(stderr, "%s:%d: TODO: %s\n", __FILE__, __LINE__, (what)), abort())
 
 // Allocator stack
@@ -68,10 +68,10 @@ CGHOST_API size_t cg_as_top;
 
 #define CG_ALLOCATOR_PUSH(allocator) cg_as[cg_as_top++] = (allocator)
 #define CG_ALLOCATOR_POP() --cg_as_top
-#define CG_ALLOCATOR_CURRENT                                                   \
-  (assert(cg_as_top != 0 && "Allocator stack underflow"),                      \
-   assert(cg_as_top != CGHOST_ALLOCATOR_STACK_SIZE &&                          \
-          "Allocator stack overflow"),                                         \
+#define CG_ALLOCATOR_CURRENT                              \
+  (assert(cg_as_top != 0 && "Allocator stack underflow"), \
+   assert(cg_as_top != CGHOST_ALLOCATOR_STACK_SIZE &&     \
+          "Allocator stack overflow"),                    \
    cg_as[cg_as_top - 1])
 
 #define CG_MALLOC CG_ALLOCATOR_CURRENT.malloc
@@ -93,37 +93,37 @@ CGHOST_API size_t cg_as_top;
 // size of the static C array
 #define ARR_SIZE(arr) (sizeof((arr)) / sizeof((arr)[0]))
 
-#define DA_EMBED(T)                                                            \
-  T *items;                                                                    \
-  size_t count;                                                                \
+#define DA_EMBED(T) \
+  T *items;         \
+  size_t count;     \
   size_t capacity;
 
-#define DA_STRUCT(T, name)                                                     \
-  typedef struct name {                                                        \
-    DA_EMBED(T)                                                                \
+#define DA_STRUCT(T, name) \
+  typedef struct name {    \
+    DA_EMBED(T)            \
   } name;
 
-#define da_from_list(T, ...)                                                   \
+#define da_from_list(T, ...) \
   da_from_list_##T((T[]){__VA_ARGS__}, sizeof((T[]){__VA_ARGS__}) / sizeof(T))
 
-#define DA_DECL_TYPE(T, name)                                                  \
-  DA_STRUCT(T, name)                                                           \
-  static inline name da_from_list_##T(const T *arr, size_t count) {            \
-    name result;                                                               \
-    result.count = count;                                                      \
-    result.capacity = count;                                                   \
-    result.items = CG_MALLOC(CG_ALLOCATOR_INSTANCE, count * sizeof(T));        \
-    memcpy(result.items, arr, count * sizeof(T));                              \
-    return result;                                                             \
-  }                                                                            \
-                                                                               \
-  static inline name da_clone_##T(name da) {                                   \
-    return (name){                                                             \
-        .items =                                                               \
-            da_clone_items((da).items, sizeof((da).items[0]), (da).count),     \
-        .count = da.count,                                                     \
-        .capacity = da.capacity,                                               \
-    };                                                                         \
+#define DA_DECL_TYPE(T, name)                                              \
+  DA_STRUCT(T, name)                                                       \
+  static inline name da_from_list_##T(const T *arr, size_t count) {        \
+    name result;                                                           \
+    result.count = count;                                                  \
+    result.capacity = count;                                               \
+    result.items = CG_MALLOC(CG_ALLOCATOR_INSTANCE, count * sizeof(T));    \
+    memcpy(result.items, arr, count * sizeof(T));                          \
+    return result;                                                         \
+  }                                                                        \
+                                                                           \
+  static inline name da_clone_##T(name da) {                               \
+    return (name){                                                         \
+        .items =                                                           \
+            da_clone_items((da).items, sizeof((da).items[0]), (da).count), \
+        .count = da.count,                                                 \
+        .capacity = da.capacity,                                           \
+    };                                                                     \
   }
 
 #ifndef DA_AUTO_SUFIX
@@ -132,100 +132,100 @@ CGHOST_API size_t cg_as_top;
 
 #define DA_DECL_TYPE_AUTO(T) DA_DECL_TYPE(T, CAT(T, DA_AUTO_SUFIX))
 
-#define da_alloc_reserved(da, capacity_)                                       \
-  do {                                                                         \
-    size_t cap = (capacity_);                                                  \
-    (da).items = CG_CALLOC(CG_ALLOCATOR_INSTANCE, cap, sizeof(*(da).items));   \
-    assert(NULL != (da).items &&                                               \
-           "Failed to allocate memory for dynamic array");                     \
-    (da).capacity = cap;                                                       \
-    (da).count = 0;                                                            \
+#define da_alloc_reserved(da, capacity_)                                     \
+  do {                                                                       \
+    size_t cap = (capacity_);                                                \
+    (da).items = CG_CALLOC(CG_ALLOCATOR_INSTANCE, cap, sizeof(*(da).items)); \
+    assert(NULL != (da).items &&                                             \
+           "Failed to allocate memory for dynamic array");                   \
+    (da).capacity = cap;                                                     \
+    (da).count = 0;                                                          \
   } while (0)
 
 #define da_alloc(da) da_alloc_reserved((da), DA_INIT_CAPACITY)
 
-#define da_free(da)                                                            \
-  do {                                                                         \
-    CG_FREE(CG_ALLOCATOR_INSTANCE, (da).items);                                \
-    (da).items = NULL;                                                         \
-    (da).count = 0;                                                            \
-    (da).capacity = 0;                                                         \
+#define da_free(da)                             \
+  do {                                          \
+    CG_FREE(CG_ALLOCATOR_INSTANCE, (da).items); \
+    (da).items = NULL;                          \
+    (da).count = 0;                             \
+    (da).capacity = 0;                          \
   } while (0)
 
 #define da_is_empty(da) ((da).count == 0)
 
-#define da_push(da, el)                                                        \
-  do {                                                                         \
-    da_maybe_expand((da));                                                     \
-    (da).items[(da).count++] = (el);                                           \
+#define da_push(da, el)              \
+  do {                               \
+    da_maybe_expand((da));           \
+    (da).items[(da).count++] = (el); \
   } while (0)
 
-#define da_pop(da)                                                             \
-  (assert(!da_is_empty((da)) &&                                                \
-          "Attempt to pop from dynamic array with size of 0"),                 \
+#define da_pop(da)                                             \
+  (assert(!da_is_empty((da)) &&                                \
+          "Attempt to pop from dynamic array with size of 0"), \
    (da).count -= 1)
 
 // NOTE: this macro is unsafe since it does not check if da is empty,
 // so make sure that da has it least 1 item before calling this macro
 #define da_back(da) (da).items[(da).count - 1]
 
-#define da_swap_remove(da, index)                                              \
-  do {                                                                         \
-    (da).items[(index)] = (da).items[--(da).count];                            \
+#define da_swap_remove(da, index)                   \
+  do {                                              \
+    (da).items[(index)] = (da).items[--(da).count]; \
   } while (0)
 
-#define da_append_da(da1, da2)                                                 \
-  do {                                                                         \
-    da_resize((da1), (da1).count + (da2).count);                               \
-    for (size_t _i = 0; _i <= (da2).count; _i += 1) {                          \
-      (da1).items[(da1).count++] = (da2).items[_i];                            \
-    }                                                                          \
+#define da_append_da(da1, da2)                        \
+  do {                                                \
+    da_resize((da1), (da1).count + (da2).count);      \
+    for (size_t _i = 0; _i <= (da2).count; _i += 1) { \
+      (da1).items[(da1).count++] = (da2).items[_i];   \
+    }                                                 \
   } while (0)
 
-#define da_resize(da, new_capacity)                                            \
-  do {                                                                         \
-    (da).items = CG_REALLOC(CG_ALLOCATOR_INSTANCE, (da).items,                 \
-                            sizeof(*(da).items) * (da).capacity,               \
-                            sizeof(*(da).items) * (new_capacity));             \
-    assert(NULL != (da).items && "Failed to allocate memory for dynamic "      \
-                                 "array");                                     \
-    memset((da).items + (da).count, 0,                                         \
-           ((new_capacity) - (da).count) * sizeof((da).items[0]));             \
-    (da).capacity = (new_capacity);                                            \
+#define da_resize(da, new_capacity)                                       \
+  do {                                                                    \
+    (da).items = CG_REALLOC(CG_ALLOCATOR_INSTANCE, (da).items,            \
+                            sizeof(*(da).items) * (da).capacity,          \
+                            sizeof(*(da).items) * (new_capacity));        \
+    assert(NULL != (da).items && "Failed to allocate memory for dynamic " \
+                                 "array");                                \
+    memset((da).items + (da).count, 0,                                    \
+           ((new_capacity) - (da).count) * sizeof((da).items[0]));        \
+    (da).capacity = (new_capacity);                                       \
   } while (0)
 
-#define da_maybe_expand(da)                                                    \
-  if ((da).count >= (da).capacity)                                             \
-  da_resize((da),                                                              \
+#define da_maybe_expand(da)        \
+  if ((da).count >= (da).capacity) \
+  da_resize((da),                  \
             (da).capacity ? (da).capacity *DA_GROW_FACTOR : DA_INIT_CAPACITY)
 
-#define da_insert(da, index, el)                                               \
-  do {                                                                         \
-    if ((index) > (da).count) {                                                \
-      fprintf(stderr, "Index %zu out of bounds for insert (size: %zu)\n",      \
-              (size_t)(index), (size_t)(da).count);                            \
-      exit(1);                                                                 \
-    }                                                                          \
-    da_maybe_expand((da));                                                     \
-    for (size_t _i = (da).count; _i > (index); --_i) {                         \
-      (da).items[_i] = (da).items[_i - 1];                                     \
-    }                                                                          \
-    (da).items[index] = (el);                                                  \
-    (da).count += 1;                                                           \
+#define da_insert(da, index, el)                                          \
+  do {                                                                    \
+    if ((index) > (da).count) {                                           \
+      fprintf(stderr, "Index %zu out of bounds for insert (size: %zu)\n", \
+              (size_t)(index), (size_t)(da).count);                       \
+      exit(1);                                                            \
+    }                                                                     \
+    da_maybe_expand((da));                                                \
+    for (size_t _i = (da).count; _i > (index); --_i) {                    \
+      (da).items[_i] = (da).items[_i - 1];                                \
+    }                                                                     \
+    (da).items[index] = (el);                                             \
+    (da).count += 1;                                                      \
   } while (0)
 
-#define da_fprintf(da, f, el_format)                                           \
-  do {                                                                         \
-    for (size_t _i = 0; _i < (da).count; _i += 1) {                            \
-      fprintf((f), (el_format), (da).items[_i]);                               \
-    }                                                                          \
+#define da_fprintf(da, f, el_format)                \
+  do {                                              \
+    for (size_t _i = 0; _i < (da).count; _i += 1) { \
+      fprintf((f), (el_format), (da).items[_i]);    \
+    }                                               \
   } while (0)
 
-#define da_fprintf_stringify(da, f, el_format, stringify)                      \
-  do {                                                                         \
-    for (size_t _i = 0; _i < (da).count; _i += 1) {                            \
-      fprintf((f), (el_format), stringify((da).items[_i]));                    \
-    }                                                                          \
+#define da_fprintf_stringify(da, f, el_format, stringify)   \
+  do {                                                      \
+    for (size_t _i = 0; _i < (da).count; _i += 1) {         \
+      fprintf((f), (el_format), stringify((da).items[_i])); \
+    }                                                       \
   } while (0)
 
 CGHOST_API void *da_clone_items(void *items, size_t el_size, size_t count);
@@ -238,9 +238,9 @@ typedef struct {
 
 #define sv_empty ((StringView){0})
 #define sv_from_cstr(str) ((StringView){.begin = str, .length = strlen(str)})
-#define sv_from_cstr_slice(str, offset, len)                                   \
+#define sv_from_cstr_slice(str, offset, len) \
   ((StringView){.begin = (str) + (offset), .length = len})
-#define sv_from_constant(c)                                                    \
+#define sv_from_constant(c) \
   ((StringView){.begin = (c), .length = sizeof((c)) - 1})
 #define sv_from_sb(sb) ((StringView){.begin = (sb).items, .length = (sb).count})
 #define sv_from_str(str) sv_from_sb((str).h->b)
@@ -248,34 +248,29 @@ typedef struct {
 #define sv_farg "%.*s"
 #define sv_expand(sv) (int)(sv).length, (sv).begin
 
-#define sv_slice(sv, offset, len)                                              \
+#define sv_slice(sv, offset, len) \
   (sv_from_cstr_slice((sv).begin, (offset), (len)))
 
 #define sv_advance(sv) (++(sv).begin, --(sv).length)
 
-CGHOST_API bool sv_equals(const StringView *lhs, const StringView *rhs);
-CGHOST_API bool sv_equals_icase(const StringView *lhs, const StringView *rhs);
-
-CGHOST_API bool sv_starts_with_cstr(const StringView *sv, const char *start);
-CGHOST_API bool sv_starts_with_cstr_icase(const StringView *sv,
-                                          const char *start);
-CGHOST_API bool sv_ends_with_cstr(const StringView *sv, const char *end);
-CGHOST_API bool sv_ends_with_cstr_icase(const StringView *sv, const char *end);
-
-CGHOST_API bool sv_starts_with(const StringView *sv, const StringView *start);
-CGHOST_API bool sv_starts_with_icase(const StringView *sv,
-                                     const StringView *start);
-CGHOST_API bool sv_ends_with(const StringView *sv, const StringView *end);
-CGHOST_API bool sv_ends_with_icase(const StringView *sv, const StringView *end);
+CGHOST_API bool sv_equals(StringView lhs, StringView rhs);
+CGHOST_API bool sv_equals_icase(StringView lhs, StringView rhs);
+CGHOST_API bool sv_starts_with_cstr(StringView sv, const char *start);
+CGHOST_API bool sv_starts_with_cstr_icase(StringView sv, const char *start);
+CGHOST_API bool sv_ends_with_cstr(StringView sv, const char *end);
+CGHOST_API bool sv_ends_with_cstr_icase(StringView sv, const char *end);
+CGHOST_API bool sv_starts_with(StringView sv, StringView start);
+CGHOST_API bool sv_starts_with_icase(StringView sv, StringView start);
+CGHOST_API bool sv_ends_with(StringView sv, StringView end);
+CGHOST_API bool sv_ends_with_icase(StringView sv, StringView end);
 CGHOST_API void sv_stripl(StringView *sv);
 CGHOST_API void sv_stripr(StringView *sv);
 CGHOST_API void sv_strip(StringView *sv);
-
-CGHOST_API int sv_index_of(const StringView *sv, int rune);
-CGHOST_API int sv_last_index_of(const StringView *sv, int rune);
-CGHOST_API int sv_index_of_str(const StringView *sv, const char *str);
+CGHOST_API int sv_index_of(StringView sv, int rune);
+CGHOST_API int sv_last_index_of(StringView sv, int rune);
+CGHOST_API int sv_index_of_str(StringView sv, const char *str);
+CGHOST_API StringView sv_split_with_delim(StringView *sv, const char *delim);
 CGHOST_API StringView sv_split(StringView *sv, const char *delim);
-CGHOST_API StringView sv_split_exclude_delim(StringView *sv, const char *delim);
 
 // StringBuilder
 
@@ -287,11 +282,11 @@ typedef struct {
 
 #define sb_free(sb) da_free((sb))
 #define sb_length(sb) da_count((sb))
-#define sb_expand_buffer(sb, new_capacity)                                     \
-  do {                                                                         \
-    if ((sb).capacity < (new_capacity)) {                                      \
-      da_resize((sb), (new_capacity));                                         \
-    }                                                                          \
+#define sb_expand_buffer(sb, new_capacity) \
+  do {                                     \
+    if ((sb).capacity < (new_capacity)) {  \
+      da_resize((sb), (new_capacity));     \
+    }                                      \
   } while (0)
 
 #define sb_farg "%.*s"
@@ -300,13 +295,11 @@ typedef struct {
 CGHOST_API StringBuilder sb_create(size_t capacity);
 CGHOST_API StringBuilder sb_create_and_fill(size_t capacity, int rune);
 CGHOST_API StringBuilder sb_createf(const char *fmt, ...);
-CGHOST_API StringBuilder sb_clone(const StringBuilder *sb);
+CGHOST_API StringBuilder sb_clone(StringBuilder sb);
 CGHOST_API StringBuilder *sb_append_rune(StringBuilder *sb, int rune);
-CGHOST_API StringBuilder *sb_append_string_view(StringBuilder *sb,
-                                                const StringView *sv);
+CGHOST_API StringBuilder *sb_append_sv(StringBuilder *sb, StringView sv);
 CGHOST_API StringBuilder *sb_append_cstr(StringBuilder *sb, const char *cstr);
-CGHOST_API StringBuilder *sb_append_sb(StringBuilder *dest,
-                                       const StringBuilder *src);
+CGHOST_API StringBuilder *sb_append_sb(StringBuilder *dest, StringBuilder src);
 #define sb_append_str(sb_ptr, str_ptr) sb_append_sb((sb_ptr), &(str_ptr)->h->b)
 CGHOST_API char *sb_get_cstr(StringBuilder *sb);
 CGHOST_API StringBuilder *sb_appendf(StringBuilder *sb, const char *fmt, ...);
@@ -323,7 +316,7 @@ typedef struct CowStr {
 } Str;
 
 #define str_is_unique(str) ((str).h->refcount == 1)
-#define str_make_unique(str)                                                   \
+#define str_make_unique(str) \
   (str_is_unique((str)) ? (str) : str_clone_unique(&(str)))
 #define str_empty str_create(0)
 
@@ -413,20 +406,20 @@ CGHOST_API void clargs_print_error(ClargParser *p, FILE *f);
 
 #define ALIGN_UP(x, align) (((x) + ((align) - 1)) & ~((align) - 1))
 
-#if !defined(__CGHOST_MEMORY_DEBUG) && !defined(NDEBUG) &&                     \
+#if !defined(__CGHOST_MEMORY_DEBUG) && !defined(NDEBUG) && \
     !defined(CGHOST_MEMORY_DEBUG)
 #define __CGHOST_MEMORY_DEBUG
 #endif
 
-#define ARENA_ALLOC_HEADER(ptr)                                                \
+#define ARENA_ALLOC_HEADER(ptr) \
   (ArenaAllocHeader *)((char *)(ptr) - offsetof(ArenaAllocHeader, data))
 
 #ifdef __CGHOST_MEMORY_DEBUG
-#define ARENA_TRACE_PTR(ptr)                                                   \
-  do {                                                                         \
-    ArenaAllocHeader *header = ARENA_ALLOC_HEADER((ptr));                      \
-    header->line = __LINE__;                                                   \
-    header->file = __FILE__;                                                   \
+#define ARENA_TRACE_PTR(ptr)                              \
+  do {                                                    \
+    ArenaAllocHeader *header = ARENA_ALLOC_HEADER((ptr)); \
+    header->line = __LINE__;                              \
+    header->file = __FILE__;                              \
   } while (0)
 #else
 #define ARENA_TRACE_PTR(ptr)
@@ -487,7 +480,7 @@ CGHOST_API CgAllocator garena_allocator;
 
 // === Inline helpers ===
 #define arena_alloc_t(arena, Type) ((Type *)arena_alloc((arena), sizeof(Type)))
-#define arena_alloc_array(arena, Type, count)                                  \
+#define arena_alloc_array(arena, Type, count) \
   ((Type *)arena_alloc((arena), sizeof(Type) * (count)))
 
 #define g_alloc_t(Type) ((Type *)g_alloc(sizeof(Type)))
@@ -546,72 +539,48 @@ CGHOST_API void *da_clone_items(void *items, size_t el_size, size_t count) {
 }
 
 // StringView
-CGHOST_API bool sv_equals(const StringView *lhs, const StringView *rhs) {
-  assert(NULL != lhs);
-  assert(NULL != rhs);
-
-  return lhs->length == rhs->length &&
-         0 == strncmp(lhs->begin, rhs->begin, lhs->length);
+CGHOST_API bool sv_equals(StringView lhs, StringView rhs) {
+  return lhs.length == rhs.length && 0 == strncmp(lhs.begin, rhs.begin, lhs.length);
 }
 
-CGHOST_API bool sv_equals_icase(const StringView *lhs, const StringView *rhs) {
-  assert(NULL != lhs);
-  assert(NULL != rhs);
-
-  return lhs->length == rhs->length &&
-         0 == strncasecmp(lhs->begin, rhs->begin, lhs->length);
+CGHOST_API bool sv_equals_icase(StringView lhs, StringView rhs) {
+  return lhs.length == rhs.length && 0 == strncasecmp(lhs.begin, rhs.begin, lhs.length);
 }
 
-CGHOST_API bool sv_starts_with_cstr(const StringView *sv, const char *start) {
-  assert(NULL != sv);
-
+CGHOST_API bool sv_starts_with_cstr(StringView sv, const char *start) {
   size_t start_len = strlen(start);
-  return sv->length >= start_len && 0 == strncmp(sv->begin, start, start_len);
+  return sv.length >= start_len && 0 == strncmp(sv.begin, start, start_len);
 }
 
-CGHOST_API bool sv_starts_with_cstr_icase(const StringView *sv,
-                                          const char *start) {
+CGHOST_API bool sv_starts_with_cstr_icase(StringView sv, const char *start) {
   size_t start_len = strlen(start);
-  return sv->length >= start_len &&
-         0 == strncasecmp(sv->begin, start, start_len);
+  return sv.length >= start_len && 0 == strncasecmp(sv.begin, start, start_len);
 }
 
-CGHOST_API bool sv_ends_with_cstr(const StringView *sv, const char *end) {
-  assert(NULL != sv);
-
+CGHOST_API bool sv_ends_with_cstr(StringView sv, const char *end) {
   size_t end_len = strlen(end);
-  return sv->length >= end_len &&
-         0 == strncmp(sv->begin + sv->length - end_len, end, end_len);
+  return sv.length >= end_len && 0 == strncmp(sv.begin + sv.length - end_len, end, end_len);
 }
 
-CGHOST_API bool sv_ends_with_cstr_icase(const StringView *sv, const char *end) {
+CGHOST_API bool sv_ends_with_cstr_icase(StringView sv, const char *end) {
   size_t end_len = strlen(end);
-  return sv->length >= end_len &&
-         0 == strncasecmp(sv->begin + sv->length - end_len, end, end_len);
+  return sv.length >= end_len && 0 == strncasecmp(sv.begin + sv.length - end_len, end, end_len);
 }
 
-CGHOST_API bool sv_starts_with(const StringView *sv, const StringView *start) {
-  return sv->length >= start->length &&
-         0 == strncmp(sv->begin, start->begin, start->length);
+CGHOST_API bool sv_starts_with(StringView sv, StringView start) {
+  return sv.length >= start.length && 0 == strncmp(sv.begin, start.begin, start.length);
 }
 
-CGHOST_API bool sv_starts_with_icase(const StringView *sv,
-                                     const StringView *start) {
-  return sv->length >= start->length &&
-         0 == strncasecmp(sv->begin, start->begin, start->length);
+CGHOST_API bool sv_starts_with_icase(StringView sv, StringView start) {
+  return sv.length >= start.length && 0 == strncasecmp(sv.begin, start.begin, start.length);
 }
 
-CGHOST_API bool sv_ends_with(const StringView *sv, const StringView *end) {
-  return sv->length >= end->length &&
-         0 == strncmp(sv->begin + sv->length - end->length, end->begin,
-                      end->length);
+CGHOST_API bool sv_ends_with(StringView sv, StringView end) {
+  return sv.length >= end.length && 0 == strncmp(sv.begin + sv.length - end.length, end.begin, end.length);
 }
 
-CGHOST_API bool sv_ends_with_icase(const StringView *sv,
-                                   const StringView *end) {
-  return sv->length >= end->length &&
-         0 == strncasecmp(sv->begin + sv->length - end->length, end->begin,
-                          end->length);
+CGHOST_API bool sv_ends_with_icase(StringView sv, StringView end) {
+  return sv.length >= end.length && 0 == strncasecmp(sv.begin + sv.length - end.length, end.begin, end.length);
 }
 
 CGHOST_API void sv_stripl(StringView *sv) {
@@ -629,30 +598,23 @@ CGHOST_API void sv_strip(StringView *sv) {
   sv_stripr(sv);
 }
 
-CGHOST_API int sv_index_of(const StringView *sv, int rune) {
-  assert(NULL != sv);
-
-  const char *found = strchr(sv->begin, rune);
-  return found - sv->begin;
+CGHOST_API int sv_index_of(StringView sv, int rune) {
+  const char *found = strchr(sv.begin, rune);
+  return found - sv.begin;
 }
 
-CGHOST_API int sv_last_index_of(const StringView *sv, int rune) {
-  assert(NULL != sv);
-
-  const char *found = strrchr(sv->begin, rune);
-  return found - sv->begin;
+CGHOST_API int sv_last_index_of(StringView sv, int rune) {
+  const char *found = strrchr(sv.begin, rune);
+  return found - sv.begin;
 }
 
-CGHOST_API int sv_index_of_str(const StringView *sv, const char *str) {
-  assert(NULL != sv);
-  const char *substr = strstr(sv->begin, str);
-  return NULL == substr ? -1 : substr - sv->begin;
+CGHOST_API int sv_index_of_str(StringView sv, const char *str) {
+  const char *substr = strstr(sv.begin, str);
+  return NULL == substr ? -1 : substr - sv.begin;
 }
 
-CGHOST_API StringView sv_split(StringView *sv, const char *delim) {
-  // returns StringView before the delim (not including)
-  // sv becomes StringView from the delim (including) to the end of the given sv
-  int index = sv_index_of_str(sv, delim);
+CGHOST_API StringView sv_split_with_delim(StringView *sv, const char *delim) {
+  int index = sv_index_of_str(*sv, delim);
   if (index < 0) {
     StringView result = *sv;
     sv->length = 0;
@@ -664,9 +626,8 @@ CGHOST_API StringView sv_split(StringView *sv, const char *delim) {
   return result;
 }
 
-CGHOST_API StringView sv_split_exclude_delim(StringView *sv,
-                                             const char *delim) {
-  int index = sv_index_of_str(sv, delim);
+CGHOST_API StringView sv_split(StringView *sv, const char *delim) {
+  int index = sv_index_of_str(*sv, delim);
   if (index < 0) {
     StringView result = *sv;
     sv->length = 0;
@@ -710,9 +671,9 @@ CGHOST_API StringBuilder sb_createf(const char *fmt, ...) {
   return sb;
 }
 
-CGHOST_API StringBuilder sb_clone(const StringBuilder *sb) {
-  StringBuilder clone = sb_create(sb->count);
-  memcpy(clone.items, sb->items, sb->count);
+CGHOST_API StringBuilder sb_clone(StringBuilder sb) {
+  StringBuilder clone = sb_create(sb.count);
+  memcpy(clone.items, sb.items, sb.count);
   return clone;
 }
 
@@ -722,28 +683,26 @@ CGHOST_API StringBuilder *sb_append_rune(StringBuilder *sb, int rune) {
   return sb;
 }
 
-CGHOST_API StringBuilder *sb_append_string_view(StringBuilder *sb,
-                                                const StringView *sv) {
-  for (size_t i = 0; i < sv->length; ++i) {
-    sb_append_rune(sb, sv->begin[i]);
+CGHOST_API StringBuilder *sb_append_sv(StringBuilder *sb, StringView sv) {
+  for (size_t i = 0; i < sv.length; ++i) {
+    sb_append_rune(sb, sv.begin[i]);
   }
   return sb;
 }
 
 CGHOST_API StringBuilder *sb_append_cstr(StringBuilder *sb, const char *cstr) {
   StringView sv = sv_from_cstr(cstr);
-  sb_append_string_view(sb, &sv);
+  sb_append_sv(sb, sv);
   return sb;
 }
 
-CGHOST_API StringBuilder *sb_append_sb(StringBuilder *dest,
-                                       const StringBuilder *src) {
-  size_t new_capacity = dest->count + src->count;
+CGHOST_API StringBuilder *sb_append_sb(StringBuilder *dest, StringBuilder src) {
+  size_t new_capacity = dest->count + src.count;
   if (dest->capacity < new_capacity) {
     sb_expand_buffer(*dest, new_capacity);
     dest->capacity = new_capacity;
   }
-  memcpy(dest->items + dest->count, src->items, src->count);
+  memcpy(dest->items + dest->count, src.items, src.count);
   dest->count = new_capacity;
   return dest;
 }
@@ -820,11 +779,11 @@ CGHOST_API bool mkdirp(StringView path, mode_t mode) {
   StringBuilder sb = sb_create(path.length + 1);
 
   while (path.length > 0) {
-    StringView currdir = sv_split_exclude_delim(&path, "/");
+    StringView currdir = sv_split(&path, "/");
     if (currdir.length == 0)
       continue;
 
-    sb_append_string_view(&sb, &currdir);
+    sb_append_sv(&sb, currdir);
     sb_append_rune(&sb, '\0');
 
     if (mkdir(sb.items, mode) != 0 && errno != EEXIST) {
