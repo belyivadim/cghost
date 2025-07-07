@@ -685,6 +685,7 @@ CGHOST_API StringBuilder sb_createf(const char *fmt, ...) {
 CGHOST_API StringBuilder sb_clone(StringBuilder sb) {
   StringBuilder clone = sb_create(sb.count);
   memcpy(clone.items, sb.items, sb.count);
+  clone.count = sb.count;
   return clone;
 }
 
